@@ -2,56 +2,50 @@
 #include <sstream>
 
 struct CDSVReader::SImplementation {
-    std::shared_ptr<CDataSource> DDataSource;
-    char DDelimiter;
+    std::shared_ptr<CDataSource> DataSource;
+    char Delimiter;
     
     SImplementation(std::shared_ptr<CDataSource> src, char delimiter) 
-        : DDataSource(src), DDelimiter(delimiter == '"' ? ',' : delimiter) {}
+        : DataSource(src), Delimiter(delimiter == '"' ? ',' : delimiter) {}
     
-    bool ReadField(std::string& field) {
-        field.clear();
-        char ch;
-        bool in_quotes = false;
+    bool ExtractField(std::string& value) {
+        value.clear();
+        char character;
+        bool insideQuotes = false;
         
-        // Skip leading whitespace
-        while (DDataSource->Peek(ch) && (ch == ' ' || ch == '\t')) {
-            DDataSource->Get(ch);
+        while (DataSource->Peek(character) && (character == ' ' || character == '\t')) {
+            DataSource->Get(character);
         }
         
-        // Check if field starts with quote
-        if (DDataSource->Peek(ch) && ch == '"') {
-            in_quotes = true;
-            DDataSource->Get(ch); // consume quote
+        if (DataSource->Peek(character) && character == '"') {
+            insideQuotes = true;
+            DataSource->Get(character);
         }
         
-        while (DDataSource->Get(ch)) {
-            if (in_quotes) {
-                if (ch == '"') {
-                    if (DDataSource->Peek(ch) && ch == '"') {
-                        // Double quote - add single quote to field
-                        DDataSource->Get(ch);
-                        field += ch;
+        while (DataSource->Get(character)) {
+            if (insideQuotes) {
+                if (character == '"') {
+                    if (DataSource->Peek(character) && character == '"') {
+                        DataSource->Get(character);
+                        value += character;
                     } else {
-                        // End of quoted field
-                        in_quotes = false;
+                        insideQuotes = false;
                     }
                 } else {
-                    field += ch;
+                    value += character;
                 }
             } else {
-                if (ch == DDelimiter || ch == '\n' || ch == '\r') {
-                    // If we hit a delimiter or newline, put it back and return
-                    // DDataSource->UnGet(ch);  // UnGet not available in interface
+                if (character == Delimiter || character == '\n' || character == '\r') {
                     return true;
-                } else if (ch == '"') {
-                    in_quotes = true;
+                } else if (character == '"') {
+                    insideQuotes = true;
                 } else {
-                    field += ch;
+                    value += character;
                 }
             }
         }
         
-        return !field.empty() || !DDataSource->End();
+        return !value.empty() || !DataSource->End();
     }
 };
 
@@ -61,41 +55,38 @@ CDSVReader::CDSVReader(std::shared_ptr<CDataSource> src, char delimiter)
 CDSVReader::~CDSVReader() = default;
 
 bool CDSVReader::End() const {
-    return DImplementation->DDataSource->End();
+    return DImplementation->DataSource->End();
 }
 
 bool CDSVReader::ReadRow(std::vector<std::string>& row) {
     row.clear();
-    char ch;
-    std::string field;
+    char character;
+    std::string value;
     
-    // Handle empty line case
-    if (DImplementation->DDataSource->Peek(ch) && (ch == '\n' || ch == '\r')) {
-        while (DImplementation->DDataSource->Peek(ch) && (ch == '\n' || ch == '\r')) {
-            DImplementation->DDataSource->Get(ch);
+    if (DImplementation->DataSource->Peek(character) && (character == '\n' || character == '\r')) {
+        while (DImplementation->DataSource->Peek(character) && (character == '\n' || character == '\r')) {
+            DImplementation->DataSource->Get(character);
         }
         return true;
     }
     
     do {
-        if (!DImplementation->ReadField(field)) {
+        if (!DImplementation->ExtractField(value)) {
             return !row.empty();
         }
-        row.push_back(field);
+        row.push_back(value);
         
-        // Check for end of line or end of input
-        if (!DImplementation->DDataSource->Peek(ch)) {
+        if (!DImplementation->DataSource->Peek(character)) {
             break;
         }
-        if (ch == '\n' || ch == '\r') {
-            while (DImplementation->DDataSource->Peek(ch) && (ch == '\n' || ch == '\r')) {
-                DImplementation->DDataSource->Get(ch);
+        if (character == '\n' || character == '\r') {
+            while (DImplementation->DataSource->Peek(character) && (character == '\n' || character == '\r')) {
+                DImplementation->DataSource->Get(character);
             }
             break;
         }
-        // Must be delimiter, consume it
-        if (ch == DImplementation->DDelimiter) {
-            DImplementation->DDataSource->Get(ch);
+        if (character == DImplementation->Delimiter) {
+            DImplementation->DataSource->Get(character);
         }
     } while (true);
     
