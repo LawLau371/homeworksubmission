@@ -2,47 +2,46 @@
 #include <sstream>
 
 struct CDSVWriter::SImplementation {
-    std::shared_ptr<CDataSink> DDataSink;
-    char DDelimiter;
-    bool DQuoteAll;
+    std::shared_ptr<CDataSink> DataSink;
+    char Delimiter;
+    bool QuoteAll;
     
     SImplementation(std::shared_ptr<CDataSink> sink, char delimiter, bool quoteall) 
-        : DDataSink(sink), DDelimiter(delimiter == '"' ? ',' : delimiter), DQuoteAll(quoteall) {}
+        : DataSink(sink), Delimiter(delimiter == '"' ? ',' : delimiter), QuoteAll(quoteall) {}
     
-    bool NeedsQuoting(const std::string& str) const {
-        if (DQuoteAll) return true;
+    bool RequiresQuoting(const std::string& str) const {
+        if (QuoteAll) return true;
         
-        for (char ch : str) {
-            if (ch == DDelimiter || ch == '"' || ch == '\n' || ch == '\r') {
+        for (char character : str) {
+            if (character == Delimiter || character == '"' || character == '\n' || character == '\r') {
                 return true;
             }
         }
         return false;
     }
     
-    bool WriteQuotedField(const std::string& field) {
-        if (!DDataSink->Put('"')) return false;
+    bool WriteEnclosedField(const std::string& field) {
+        if (!DataSink->Put('"')) return false;
         
-        for (char ch : field) {
-            if (ch == '"') {
-                // Double up quotes
-                if (!DDataSink->Put('"')) return false;
-                if (!DDataSink->Put('"')) return false;
+        for (char character : field) {
+            if (character == '"') {
+                if (!DataSink->Put('"')) return false;
+                if (!DataSink->Put('"')) return false;
             } else {
-                if (!DDataSink->Put(ch)) return false;
+                if (!DataSink->Put(character)) return false;
             }
         }
         
-        return DDataSink->Put('"');
+        return DataSink->Put('"');
     }
     
-    bool WriteField(const std::string& field) {
-        if (NeedsQuoting(field)) {
-            return WriteQuotedField(field);
+    bool WriteSingleField(const std::string& field) {
+        if (RequiresQuoting(field)) {
+            return WriteEnclosedField(field);
         }
         
-        for (char ch : field) {
-            if (!DDataSink->Put(ch)) return false;
+        for (char character : field) {
+            if (!DataSink->Put(character)) return false;
         }
         return true;
     }
@@ -55,20 +54,20 @@ CDSVWriter::~CDSVWriter() = default;
 
 bool CDSVWriter::WriteRow(const std::vector<std::string>& row) {
     if (row.empty()) {
-        return DImplementation->DDataSink->Put('\n');
+        return DImplementation->DataSink->Put('\n');
     }
     
-    for (size_t i = 0; i < row.size(); ++i) {
-        if (!DImplementation->WriteField(row[i])) {
+    for (size_t index = 0; index < row.size(); ++index) {
+        if (!DImplementation->WriteSingleField(row[index])) {
             return false;
         }
         
-        if (i < row.size() - 1) {
-            if (!DImplementation->DDataSink->Put(DImplementation->DDelimiter)) {
+        if (index < row.size() - 1) {
+            if (!DImplementation->DataSink->Put(DImplementation->Delimiter)) {
                 return false;
             }
         }
     }
     
-    return DImplementation->DDataSink->Put('\n');
+    return DImplementation->DataSink->Put('\n');
 }
