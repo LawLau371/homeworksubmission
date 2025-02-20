@@ -3,53 +3,53 @@
 #include <sstream>
 
 struct CXMLWriter::SImplementation {
-    std::shared_ptr<CDataSink> DDataSink;
-    std::stack<std::string> DElementStack;
+    std::shared_ptr<CDataSink> OutputSink;
+    std::stack<std::string> ElementStack;
     
-    SImplementation(std::shared_ptr<CDataSink> sink) : DDataSink(sink) {}
+    SImplementation(std::shared_ptr<CDataSink> sink) : OutputSink(sink) {}
     
-    bool WriteString(const std::string& str) {
-        for(char ch : str) {
-            if(!DDataSink->Put(ch)) {
+    bool WriteText(const std::string& text) {
+        for(char character : text) {
+            if(!OutputSink->Put(character)) {
                 return false;
             }
         }
         return true;
     }
     
-    std::string EncodeCharData(const std::string& data) {
-        std::string Result;
-        for(char ch : data) {
-            switch(ch) {
+    std::string ConvertCharData(const std::string& inputData) {
+        std::string encodedString;
+        for(char character : inputData) {
+            switch(character) {
                 case '<':
-                    Result += "&lt;";
+                    encodedString += "&lt;";
                     break;
                 case '>':
-                    Result += "&gt;";
+                    encodedString += "&gt;";
                     break;
                 case '&':
-                    Result += "&amp;";
+                    encodedString += "&amp;";
                     break;
                 case '\'':
-                    Result += "&apos;";
+                    encodedString += "&apos;";
                     break;
                 case '"':
-                    Result += "&quot;";
+                    encodedString += "&quot;";
                     break;
                 default:
-                    Result += ch;
+                    encodedString += character;
             }
         }
-        return Result;
+        return encodedString;
     }
     
-    bool WriteAttributes(const std::vector<SXMLEntity::TAttribute>& attributes) {
-        for(const auto& attr : attributes) {
-            if(!WriteString(" ") ||
-               !WriteString(std::get<0>(attr)) ||
-               !WriteString("=\"") ||
-               !WriteString(EncodeCharData(std::get<1>(attr))) ||
-               !WriteString("\"")) {
+    bool WriteElementAttributes(const std::vector<SXMLEntity::TAttribute>& attributeList) {
+        for(const auto& attribute : attributeList) {
+            if(!WriteText(" ") ||
+               !WriteText(std::get<0>(attribute)) ||
+               !WriteText("=\"") ||
+               !WriteText(ConvertCharData(std::get<1>(attribute))) ||
+               !WriteText("\"")) {
                 return false;
             }
         }
@@ -64,13 +64,13 @@ CXMLWriter::CXMLWriter(std::shared_ptr<CDataSink> sink)
 CXMLWriter::~CXMLWriter() = default;
 
 bool CXMLWriter::Flush() {
-    while(!DImplementation->DElementStack.empty()) {
-        if(!DImplementation->WriteString("</") ||
-           !DImplementation->WriteString(DImplementation->DElementStack.top()) ||
-           !DImplementation->WriteString(">")) {
+    while(!DImplementation->ElementStack.empty()) {
+        if(!DImplementation->WriteText("</") ||
+           !DImplementation->WriteText(DImplementation->ElementStack.top()) ||
+           !DImplementation->WriteText(">")) {
             return false;
         }
-        DImplementation->DElementStack.pop();
+        DImplementation->ElementStack.pop();
     }
     return true;
 }
@@ -78,36 +78,36 @@ bool CXMLWriter::Flush() {
 bool CXMLWriter::WriteEntity(const SXMLEntity& entity) {
     switch(entity.DType) {
         case SXMLEntity::EType::StartElement:
-            if(!DImplementation->WriteString("<") ||
-               !DImplementation->WriteString(entity.DNameData) ||
-               !DImplementation->WriteAttributes(entity.DAttributes) ||
-               !DImplementation->WriteString(">")) {
+            if(!DImplementation->WriteText("<") ||
+               !DImplementation->WriteText(entity.DNameData) ||
+               !DImplementation->WriteElementAttributes(entity.DAttributes) ||
+               !DImplementation->WriteText(">")) {
                 return false;
             }
-            DImplementation->DElementStack.push(entity.DNameData);
+            DImplementation->ElementStack.push(entity.DNameData);
             return true;
             
         case SXMLEntity::EType::EndElement:
-            if(DImplementation->DElementStack.empty() ||
-               DImplementation->DElementStack.top() != entity.DNameData) {
+            if(DImplementation->ElementStack.empty() ||
+               DImplementation->ElementStack.top() != entity.DNameData) {
                 return false;
             }
-            if(!DImplementation->WriteString("</") ||
-               !DImplementation->WriteString(entity.DNameData) ||
-               !DImplementation->WriteString(">")) {
+            if(!DImplementation->WriteText("</") ||
+               !DImplementation->WriteText(entity.DNameData) ||
+               !DImplementation->WriteText(">")) {
                 return false;
             }
-            DImplementation->DElementStack.pop();
+            DImplementation->ElementStack.pop();
             return true;
             
         case SXMLEntity::EType::CharData:
-            return DImplementation->WriteString(DImplementation->EncodeCharData(entity.DNameData));
+            return DImplementation->WriteText(DImplementation->ConvertCharData(entity.DNameData));
             
         case SXMLEntity::EType::CompleteElement:
-            if(!DImplementation->WriteString("<") ||
-               !DImplementation->WriteString(entity.DNameData) ||
-               !DImplementation->WriteAttributes(entity.DAttributes) ||
-               !DImplementation->WriteString("/>")) {
+            if(!DImplementation->WriteText("<") ||
+               !DImplementation->WriteText(entity.DNameData) ||
+               !DImplementation->WriteElementAttributes(entity.DAttributes) ||
+               !DImplementation->WriteText("/>")) {
                 return false;
             }
             return true;
